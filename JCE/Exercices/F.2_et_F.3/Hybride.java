@@ -33,20 +33,15 @@ public class Hybride {
 
     public static void main(String[] args) throws Exception {
 
-        // Initialisation de la clef publique et de la clef privée
-
-        PrivateKey clefPrivee;
-
         // Récupération du trousseau
 
         FileInputStream trousseau;
-        // Pour manipuler le trousseau
         KeyStore magasin = KeyStore.getInstance("PKCS12");
         trousseau = new FileInputStream(nomDuTrousseau);
         magasin.load(trousseau, motDePasse);
         trousseau.close();
 
-        // Récupération des noms de clefs
+        // Récupération des clefs privées
 
         final Enumeration<String> tousLesAliases = magasin.aliases();
         KeyStore.ProtectionParameter protection = new KeyStore.PasswordProtection(motDePasse);
@@ -55,10 +50,12 @@ public class Hybride {
             if (alias.contains("privée")) {
                 PrivateKeyEntry entreePrivee ;
                 entreePrivee = (KeyStore.PrivateKeyEntry) magasin.getEntry(alias, protection);
-                clefPrivee = entreePrivee.getPrivateKey();
+                PrivateKey clefPrivee = entreePrivee.getPrivateKey();
                 clefsPrivees.add(clefPrivee);
             }
         }
+
+        // Initialisation des flux pour le fichier input et le fichier output
 
         try{
             fis = new FileInputStream(args[0]);
@@ -66,11 +63,16 @@ public class Hybride {
         }
         catch (Exception e) { System.out.println("Fichier inexistant:"+ e.getMessage());}
 
+        // Lecture de la clef chiffrée
+
         messagechiffre = fis.readAllBytes();
+
+        // Essais du déchiffrement de la clef avec les clefs privées
 
         for (PrivateKey clef : clefsPrivees) {
             for (String algo : algos) {
                 try {
+
                     chiffreur = Cipher.getInstance(algo);
                 }
                 catch (Exception e) { System.out.println(algo + " n'est pas disponible.");}
@@ -79,16 +81,25 @@ public class Hybride {
 
                     chiffreur.init(Cipher.DECRYPT_MODE, clef);
 
-                    // Lecture du message chiffré par le chiffreur
+                    // Ajout de la clef à la liste des clefs privées si elle est déchiffrée et de bonne taille
 
-                    messagedechiffres.add(chiffreur.doFinal(messagechiffre));
+                    byte[] message = chiffreur.doFinal(messagechiffre);
+                    String hexMessage = toHex(message);
+                    int len = hexMessage.length();
+                    if (len == 16 || len == 24 || len == 32) {
+                        messagedechiffres.add(message);
+                    }
+
                     // Fermeture des flux
 
                     fos.close();
                     fis.close();
+
                 } catch (Exception ignored) {}
             }
         }
+
+        // Affichage des clefs possibles
 
         System.out.println("Clef possible :");
         for (byte[] message : messagedechiffres) {
