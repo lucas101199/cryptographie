@@ -24,14 +24,20 @@ public class F1 {
 
     public static void main(String[] args) {
 
+        // Création du chiffreur AES en CBC avec le bourrage PKCS5Padding
+
         try {
             chiffreur = Cipher.getInstance("AES/CBC/PKCS5Padding");
         }
         catch (Exception e) { System.out.println("AES n'est pas disponible.");}
 
+        // Création de la clef secrète et du vecteur d'initialisation
+
         clefSecrète = new SecretKeySpec(clefBrute, "AES");
         byte[] iv = { 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1 };
         IvParameterSpec ivspec = new IvParameterSpec(iv);
+
+        // Initialisation des flux pour le fichier input et le fichier output
 
         try{
             fis = new FileInputStream(args[0]);
@@ -39,22 +45,23 @@ public class F1 {
         }
         catch (Exception e) { System.out.println("Fichier inexistant:"+ e.getMessage());}
         try {
+
+            // Initialisation du chiffreur en mode déchiffrement
+
             chiffreur.init(Cipher.DECRYPT_MODE, clefSecrète, ivspec);
+
+            // Lecture du fichier input par le chiffreur
+
             cis = new CipherInputStream(fis, chiffreur);
             while ( ( nbOctetsLus = cis.read(buffer) ) != -1 ) {
                 fos.write(buffer, 0, nbOctetsLus);
             }
+
+            // Fermeture des flux
+
             fos.close();
             cis.close();
             fis.close();
         } catch (Exception e) { System.out.println("Déchiffrement impossible:"+ e.getMessage());}
-    }
-
-    public static String toHex(byte[] données) {
-        StringBuffer sb = new StringBuffer();
-        for(byte k: données) {
-            sb.append(String.format("%02X", k));
-        }
-        return sb.toString();
     }
 }
