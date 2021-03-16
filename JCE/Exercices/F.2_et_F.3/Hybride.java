@@ -1,12 +1,15 @@
 // -*- coding: utf-8 -*-
 
 import javax.crypto.Cipher;
+import javax.crypto.spec.IvParameterSpec;
+import javax.crypto.spec.SecretKeySpec;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.security.KeyStore;
 import java.security.KeyStore.PrivateKeyEntry;
 import java.security.PrivateKey;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Enumeration;
 
@@ -23,11 +26,21 @@ public class Hybride {
     private static FileInputStream fis;
     private static FileOutputStream fos;
 
-    private static final ArrayList<String> algos = new ArrayList<>() {
+    private static final ArrayList<String> algosRSA = new ArrayList<>() {
         {
             add("RSA/ECB/PKCS1Padding");
             add("RSA/ECB/OAEPWithSHA-1AndMGF1Padding");
             add("RSA/ECB/OAEPWithSHA-256AndMGF1Padding");
+        }
+    };
+
+    private static final ArrayList<String> algosAES = new ArrayList<>() {
+        {
+            add("AES/ECB/PKCS5Padding");
+            add("AES/CBC/PKCS5Padding");
+            add("AES/CFB/PKCS5Padding");
+            add("AES/OFB/PKCS5Padding");
+            add("AES/CTR/PKCS5Padding");
         }
     };
 
@@ -66,11 +79,12 @@ public class Hybride {
         // Lecture de la clef chiffrée
 
         messagechiffre = fis.readAllBytes();
+        fis.close();
 
         // Essais du déchiffrement de la clef avec les clefs privées
 
         for (PrivateKey clef : clefsPrivees) {
-            for (String algo : algos) {
+            for (String algo : algosRSA) {
                 try {
 
                     chiffreur = Cipher.getInstance(algo);
@@ -90,11 +104,6 @@ public class Hybride {
                         messagedechiffres.add(message);
                     }
 
-                    // Fermeture des flux
-
-                    fos.close();
-                    fis.close();
-
                 } catch (Exception ignored) {}
             }
         }
@@ -103,10 +112,59 @@ public class Hybride {
 
         System.out.println("Clef possible :");
         for (byte[] message : messagedechiffres) {
+            fos.write(message);
             String hexMessage = toHex(message);
-            int len = hexMessage.length();
-            if (len == 16 || len == 24 || len == 32) {
-                System.out.println(hexMessage);
+            System.out.println(hexMessage);
+        }
+
+        fos.close();
+
+        // Ouverture des fichiers pour AES
+
+        try{
+            fis = new FileInputStream(args[2]);
+            fos = new FileOutputStream(args[3]);
+        }
+        catch (Exception e) { System.out.println("Fichier inexistant:"+ e.getMessage());}
+
+        // Lecture du fichier input et création du vecteur d'initialisation
+
+        byte[] vec = fis.readNBytes(16);
+        //fis.read(vec,0,16);
+        byte[] secret = fis.readAllBytes();
+        fis.close();
+        IvParameterSpec ivspec = new IvParameterSpec(vec);
+
+        for (byte[] clefBrute : messagedechiffres) {
+            SecretKeySpec clefSecrete = new SecretKeySpec(clefBrute, "AES");
+            for (String algo : algosAES) {
+                try {
+
+                    chiffreur = Cipher.getInstance(algo);
+                }
+                catch (Exception e) { System.out.println(algo + " n'est pas disponible.");}
+
+                try {
+
+                    // Initialisation du chiffreur sans vecteur pour ECB et avec vecteur pour les autres
+
+                    if (algosAES.indexOf(algo) == 0)
+                        chiffreur.init(Cipher.DECRYPT_MODE, clefSecrete);
+                    else
+                        chiffreur.init(Cipher.DECRYPT_MODE, clefSecrete,ivspec);
+
+                    // Déchiffrage du message et si c'est un pdf le mets dans le fichier output
+
+                    byte[] dechiffre = chiffreur.doFinal(secret);
+                    byte[] debut = Arrays.copyOfRange(dechiffre,0,4);
+                    if (new String(debut).equals("%PDF")) {
+                        fos.write(dechiffre);
+                        fos.close();
+                        System.out.println("Fichier décrypté");
+                        break;
+                    }
+
+                } catch (Exception ignored) {}
             }
         }
 
