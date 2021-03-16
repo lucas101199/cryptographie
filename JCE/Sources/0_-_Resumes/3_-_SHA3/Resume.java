@@ -5,8 +5,7 @@ import java.security.*;
 
 import org.bouncycastle.jcajce.provider.digest.*;
 
-public class Resume
-{
+public class Resume {
     public static void main(String[] args)
     {
         try {
