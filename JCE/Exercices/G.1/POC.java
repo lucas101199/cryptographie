@@ -9,6 +9,7 @@ import java.security.interfaces.RSAPublicKey;
 import java.security.spec.RSAPublicKeySpec;
 import java.util.Arrays;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
+import javax.crypto.CipherInputStream;
 
 public class POC {
 
@@ -52,9 +53,32 @@ public class POC {
         chiffreur.init(Cipher.ENCRYPT_MODE, clefPublique);
 
         byte[] clefChiffre = chiffreur.doFinal(k);
-        fos.write(clefChiffre, 0, 128);
-        fos.write(iv, 128, 16);
-        //secretKey - new SecretKeySpec(clefChiffre);
+        byte[] a = "\n".getBytes();
+        fos.write(clefChiffre);
+        fos.write(a);
+        fos.write(iv);
+        fos.write(a);
 
+        // chiffrage AES
+        secretKey = new SecretKeySpec(k, "AES");
+
+        // Création du chiffreur AES en CBC avec le bourrage PKCS5Padding
+        try {
+            chiffreur = Cipher.getInstance("AES/CBC/PKCS5Padding");
+        }
+        catch (Exception e) { System.out.println("AES n'est pas disponible.");}
+        chiffreur.init(Cipher.ENCRYPT_MODE, secretKey, ivspec);
+
+        // encrypt input file
+        CipherInputStream cis = new CipherInputStream(fis, chiffreur);
+        byte[] buffer = new byte[1024];
+        int bytesRead;
+        while ( ( bytesRead = cis.read(buffer) ) != -1 ) {
+            fos.write(buffer, 0, bytesRead);
+        }
+
+        fos.close();
+        cis.close();
+        fis.close();
     }
 }
